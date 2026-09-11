@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 4000;
 const ORIGINS = (process.env.CLIENT_ORIGIN || "http://localhost:5173").split(",");
 
 const app = express();
-app.use(cors({ origin: ORIGINS }));
+app.use(cors({ origin: ORIGINS.includes("*") ? true : ORIGINS }));
 app.use(express.json());
 
 // ---------------------------------------------------------------------------
@@ -57,7 +57,7 @@ app.post("/api/presence/register", (req, res) => {
 // ---------------------------------------------------------------------------
 const httpServer = http.createServer(app);
 const io = new Server(httpServer, {
-  cors: { origin: ORIGINS, methods: ["GET", "POST"] },
+  cors: { origin: ORIGINS.includes("*") ? true : ORIGINS, methods: ["GET", "POST"] },
   maxHttpBufferSize: 1e6,
 });
 
