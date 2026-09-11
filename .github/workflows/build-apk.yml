@@ -28,7 +28,7 @@ jobs:
           java-version: "21"
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build the web app
         run: npm run build
