@@ -69,21 +69,38 @@ function roomOf(socket) {
 }
 
 io.use((socket, next) => {
-  // Basic signaling-layer auth: a real deployment verifies a signed session
-  // token here (e.g. JWT issued by the auth service) before allowing the
-  // socket to join. Kept intentionally simple for the demo backend.
-  const { userId, displayName } = socket.handshake.auth || {};
+  const { userId, displayName, username, avatarSeed } = socket.handshake.auth || {};
   if (!userId || typeof userId !== "string" || userId.length > 64) {
     return next(new Error("unauthorized"));
   }
   socket.userId = userId;
   socket.displayName = String(displayName || "Guest").slice(0, 40);
+  socket.username = String(username || userId).slice(0, 40);
+  socket.avatarSeed = String(avatarSeed || socket.displayName).slice(0, 40);
   next();
 });
 
 io.on("connection", (socket) => {
+  db.users.set(socket.userId, {
+    id: socket.userId,
+    username: socket.username,
+    displayName: socket.displayName,
+    avatarSeed: socket.avatarSeed,
+  });
   db.presence.set(socket.userId, "online");
-  socket.broadcast.emit("presence:update", { userId: socket.userId, status: "online" });
+
+  const onlineUsers = [...db.users.values()].filter(
+    (u) => u.id !== socket.userId && db.presence.get(u.id) === "online"
+  );
+  socket.emit("presence:snapshot", { users: onlineUsers });
+
+  socket.broadcast.emit("presence:update", {
+    userId: socket.userId,
+    status: "online",
+    username: socket.username,
+    displayName: socket.displayName,
+    avatarSeed: socket.avatarSeed,
+  });
 
   socket.on("call:invite", ({ roomId, toUserId, mode }) => {
     if (!isValidRoomId(roomId) || typeof toUserId !== "string") return;
@@ -99,8 +116,6 @@ io.on("connection", (socket) => {
     });
   });
 
-  // Every authenticated socket also joins a room named after its own userId
-  // so it can be addressed directly (call invites, presence, etc).
   socket.join(socket.userId);
 
   socket.on("call:accept", ({ roomId }) => {
@@ -128,7 +143,6 @@ io.on("connection", (socket) => {
     socket.leave(roomId);
   });
 
-  // ---- WebRTC negotiation relay -------------------------------------------------
   socket.on("rtc:offer", ({ roomId, sdp }) => {
     if (!isValidRoomId(roomId)) return;
     socket.to(roomId).emit("rtc:offer", { sdp, fromUserId: socket.userId });
