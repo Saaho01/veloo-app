@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
 import { CallManager } from "../services/callManager";
+import { signalingClient } from "../services/signaling";
 import { MediaError } from "../services/webrtc";
 import { CallMode, CallScreenState, NetworkTier, User } from "../types";
 import { mockDirectory } from "../services/mockData";
@@ -27,6 +28,7 @@ interface CallContextValue {
   muted: boolean;
   cameraOn: boolean;
   dataSaver: boolean;
+  onlineUsers: User[];
   startCall: (peer: User, mode: CallMode) => void;
   acceptIncoming: () => void;
   rejectIncoming: () => void;
@@ -60,6 +62,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
   const [dataSaver, setDataSaver] = useState(false);
+  const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
 
   const callStartRef = useRef<number | null>(null);
   const durationTimerRef = useRef<number | null>(null);
@@ -123,7 +126,42 @@ export function CallProvider({ children }: { children: ReactNode }) {
     });
     manager.init(user);
     managerRef.current = manager;
-    return () => manager.destroy();
+
+    function handleSnapshot(payload: { users: User[] }) {
+      setOnlineUsers(payload.users.map((u) => ({ ...u, status: "online" as const })));
+    }
+    function handleUpdate(payload: {
+      userId: string;
+      status: "online" | "offline";
+      username?: string;
+      displayName?: string;
+      avatarSeed?: string;
+    }) {
+      setOnlineUsers((prev) => {
+        if (payload.status === "offline") return prev.filter((u) => u.id !== payload.userId);
+        const next: User = {
+          id: payload.userId,
+          username: payload.username || payload.userId,
+          displayName: payload.displayName || payload.username || payload.userId,
+          avatarSeed: payload.avatarSeed || payload.displayName || payload.userId,
+          status: "online",
+        };
+        const idx = prev.findIndex((u) => u.id === payload.userId);
+        if (idx === -1) return [...prev, next];
+        const copy = [...prev];
+        copy[idx] = next;
+        return copy;
+      });
+    }
+    signalingClient.on("presence:snapshot", handleSnapshot);
+    signalingClient.on("presence:update", handleUpdate);
+
+    return () => {
+      signalingClient.off("presence:snapshot", handleSnapshot);
+      signalingClient.off("presence:update", handleUpdate);
+      manager.destroy();
+      setOnlineUsers([]);
+    };
   }, [user?.id]);
 
   function startCall(target: User, callMode: CallMode) {
@@ -232,6 +270,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       muted,
       cameraOn,
       dataSaver,
+      onlineUsers,
       startCall,
       acceptIncoming,
       rejectIncoming,
@@ -259,6 +298,7 @@ export function CallProvider({ children }: { children: ReactNode }) {
       muted,
       cameraOn,
       dataSaver,
+      onlineUsers,
     ]
   );
 
