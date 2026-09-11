@@ -3,6 +3,7 @@ import { io, Socket } from "socket.io-client";
 export type SignalPayload = Record<string, unknown>;
 
 export type SignalingEvent =
+  | "presence:snapshot"
   | "presence:update"
   | "call:incoming"
   | "call:accepted"
@@ -25,10 +26,15 @@ const SIGNALING_URL = import.meta.env.VITE_SIGNALING_URL || "http://localhost:40
 export class SignalingClient {
   private socket: Socket | null = null;
 
-  connect(userId: string, displayName: string): Socket {
+  connect(user: { id: string; username: string; displayName: string; avatarSeed: string }): Socket {
     if (this.socket?.connected) return this.socket;
     this.socket = io(SIGNALING_URL, {
-      auth: { userId, displayName },
+      auth: {
+        userId: user.id,
+        displayName: user.displayName,
+        username: user.username,
+        avatarSeed: user.avatarSeed,
+      },
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionAttempts: Infinity,
