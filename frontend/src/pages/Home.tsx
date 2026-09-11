@@ -10,9 +10,12 @@ import { User } from "../types";
 
 export function Home() {
   const [query, setQuery] = useState("");
-  const { startCall } = useCall();
+  const { startCall, onlineUsers } = useCall();
   const history = useMemo(() => mockDirectory.history().slice(0, 6), []);
-  const results = query.trim() ? mockDirectory.search(query) : [];
+  const q = query.trim().toLowerCase();
+  const results = q
+    ? onlineUsers.filter((u) => u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q))
+    : [];
 
   function handleCall(user: User, mode: "video" | "audio") {
     startCall(user, mode);
@@ -26,13 +29,20 @@ export function Home() {
           <SearchInput value={query} onChange={setQuery} />
         </div>
 
-        {results.length > 0 ? (
+        {q ? (
           <div className="mt-4">
-            <p className="px-5 text-[12px] font-medium uppercase tracking-wide text-muted/70">People</p>
+            <p className="px-5 text-[12px] font-medium uppercase tracking-wide text-muted/70">
+              People online now
+            </p>
             <div className="mt-1">
-              {results.map((u) => (
-                <ContactRow key={u.id} user={u} onCall={(mode) => handleCall(u, mode)} />
-              ))}
+              {results.length === 0 ? (
+                <p className="px-5 py-6 text-[14px] text-muted">
+                  No match. The other person needs to be signed in with the app open right now for their name to
+                  show up here.
+                </p>
+              ) : (
+                results.map((u) => <ContactRow key={u.id} user={u} onCall={(mode) => handleCall(u, mode)} />)
+              )}
             </div>
           </div>
         ) : (
