@@ -7,10 +7,13 @@ import { useCall } from "../context/CallContext";
 export function Contacts() {
   const [query, setQuery] = useState("");
   const [, forceUpdate] = useState(0);
-  const { startCall } = useCall();
+  const { startCall, onlineUsers } = useCall();
 
   const contacts = useMemo(() => mockDirectory.contacts(), [query]);
-  const searchResults = query.trim() ? mockDirectory.search(query) : [];
+  const q = query.trim().toLowerCase();
+  const searchResults = q
+    ? onlineUsers.filter((u) => u.displayName.toLowerCase().includes(q) || u.username.toLowerCase().includes(q))
+    : [];
   const existingIds = new Set(contacts.map((c) => c.id));
   const suggestions = searchResults.filter((u) => !existingIds.has(u.id));
 
@@ -26,7 +29,9 @@ export function Contacts() {
       <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
         {suggestions.length > 0 && (
           <div className="mt-4">
-            <p className="px-5 text-[12px] font-medium uppercase tracking-wide text-muted/70">Add new</p>
+            <p className="px-5 text-[12px] font-medium uppercase tracking-wide text-muted/70">
+              Online now — add as contact
+            </p>
             {suggestions.map((u) => (
               <ContactRow
                 key={u.id}
