@@ -39,7 +39,7 @@ export class CallManager {
 
   init(user: User) {
     this.currentUser = user;
-    signalingClient.connect(user.id, user.displayName);
+    signalingClient.connect(user);
     signalingClient.on("call:incoming", (payload) => this.events.onIncomingCall(payload));
     signalingClient.on("call:accepted", () => this.beginNegotiationAsCaller());
     signalingClient.on("call:rejected", () => this.events.onStateChange("ended"));
